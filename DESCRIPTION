@@ -1,0 +1,24 @@
+Package: multiomicsretina
+Title: Reproducible Multi-Omics Integration Pipeline for Human Retinal Research
+Version: 0.1.0
+Authors@R:
+    person("Project", "Maintainer", email = "maintainer@example.org", role = c("aut", "cre"))
+Description: Research-oriented R pipeline for preprocessing, MOFA2 integration,
+    downstream interpretation, and stability assessment of proteomics,
+    lipidomics, and metabolomics data from human retinal studies.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports:
+    dplyr,
+    ggplot2,
+    jsonlite,
+    MOFA2,
+    purrr,
+    readr,
+    scales,
+    stringr,
+    targets,
+    tibble,
+    tidyr,
+    yaml
