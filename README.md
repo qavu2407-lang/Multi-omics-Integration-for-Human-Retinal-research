@@ -1,18 +1,50 @@
 # Multi-omics-Integration-for-Human-Retinal-research
 
-An end-to-end, research-oriented pipeline for multi-omics human retinal studies, spanning preprocessing, quality control, MOFA2 integration, downstream interpretation, and robustness assessment.
+An end-to-end, research-oriented workflow for multi-omics studies spanning preprocessing, quality control, MOFA+ integration, downstream interpretation, and robustness assessment.
 
-## R pipeline architecture
+## Python pipeline architecture
 
-The original notebook workflow has been restructured into a modular R pipeline built with `targets` for reproducibility and cleaner separation of concerns:
+The notebook logic now has a reusable Python package and CLI intended for running the same MOFA+ workflow on new datasets with a configuration file instead of ad hoc notebook edits:
 
-- `R/io.R`: raw data ingestion, label extraction, and cross-view sample alignment
-- `R/preprocessing.R`: missingness checks, filtering, imputation, and feature selection
-- `R/visualization.R`: EDA, top-variable-feature plots, and PCA visualizations
-- `R/mofa_analysis.R`: MOFA2 training and downstream latent-factor interpretation
-- `R/evaluation.R`: repeated-seed stability and sample-size sensitivity analyses
-- `_targets.R`: dependency-aware pipeline orchestration
-- `config/analysis.yaml`: study configuration and analysis parameters
+- `src/python/mofapipeline/io.py`: data ingestion, label extraction, and cross-view sample alignment
+- `src/python/mofapipeline/preprocessing.py`: QC summaries, missingness filtering, imputation, and variance filtering
+- `src/python/mofapipeline/eda.py`: EDA plots, top-variable-feature visualizations, and PCA diagnostics
+- `src/python/mofapipeline/mofa.py`: MOFA+ training and downstream interpretation
+- `src/python/mofapipeline/evaluation.py`: repeated-seed stability and sample-size sensitivity analyses
+- `src/python/mofapipeline/cli.py`: command-line entrypoint for staged or end-to-end execution
+- `config/analysis_python.yaml`: reusable study configuration
+
+## Legacy R pipeline
+
+The original refactor into R remains available:
+
+- `src/r/io.R`
+- `src/r/preprocessing.R`
+- `src/r/visualization.R`
+- `src/r/mofa_analysis.R`
+- `src/r/evaluation.R`
+- `_targets.R`
+- `config/analysis.yaml`
+
+## Repository layout
+
+```text
+.
+├── README.md
+├── config/
+├── data/
+├── notebooks/
+│   └── python/
+├── plots/
+├── results/
+├── scripts/
+│   ├── python/
+│   └── r/
+├── src/
+│   ├── python/
+│   └── r/
+└── tests/
+```
 
 ## Expected input format
 
@@ -28,18 +60,46 @@ Each file is expected to contain:
 - one special row where `sample == "label"` containing biological group labels for each sample column
 - all remaining rows representing molecular features
 
-## Run the pipeline
+## Install the Python pipeline
+
+```bash
+python3 -m pip install -e .[mofa]
+```
+
+## Run the Python pipeline
+
+Full run:
+
+```bash
+python3 scripts/python/run_pipeline.py --config config/analysis_python.yaml --stage all
+```
+
+Or via the console entrypoint:
+
+```bash
+mofa-pipeline --config config/analysis_python.yaml --stage all
+```
+
+Run a single stage:
+
+```bash
+mofa-pipeline --config config/analysis_python.yaml --stage eda
+mofa-pipeline --config config/analysis_python.yaml --stage train
+mofa-pipeline --config config/analysis_python.yaml --stage evaluate
+```
+
+## Run the legacy R pipeline
 
 ```r
-Rscript scripts/run_pipeline.R
+Rscript scripts/r/run_pipeline.R
 ```
 
 Phase-specific entrypoints:
 
 ```r
-Rscript scripts/01_preprocess.R
-Rscript scripts/02_train_and_downstream.R
-Rscript scripts/03_evaluation.R
+Rscript scripts/r/01_preprocess.R
+Rscript scripts/r/02_train_and_downstream.R
+Rscript scripts/r/03_evaluation.R
 ```
 
 Or interactively:
@@ -53,8 +113,9 @@ tar_visnetwork()
 ## Research-facing improvements over the notebooks
 
 - Centralized configuration instead of repeated hard-coded parameters
-- Reusable functions instead of duplicated notebook cells
+- Reusable stage-specific modules instead of duplicated notebook cells
 - Explicit quality-control outputs and session metadata
-- Sample alignment checks across omics layers
+- Sample alignment and label-consistency checks across omics layers
+- Reproducible seeds and persistent MOFA artifacts for auditability
 - Defensible evaluation design using repeated-seed stability and sample-subset sensitivity
-- A file-based pipeline better suited to collaboration, auditability, and manuscript preparation
+- A package-based workflow better suited to collaboration, method reuse, and manuscript preparation

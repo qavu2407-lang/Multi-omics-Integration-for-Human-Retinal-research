@@ -17,7 +17,7 @@ tar_option_set(
   format = "rds"
 )
 
-invisible(lapply(list.files("R", pattern = "[.][Rr]$", full.names = TRUE), source))
+invisible(lapply(list.files("src/r", pattern = "[.][Rr]$", full.names = TRUE), source))
 
 list(
   tar_target(config, read_config("config/analysis.yaml"), cue = tar_cue(mode = "always")),
