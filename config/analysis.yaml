@@ -1,0 +1,25 @@
+paths:
+  proteomics: "data/proteins.csv"
+  lipidomics: "data/lipids.csv"
+  metabolomics: "data/metabolites.csv"
+  qc_dir: "results/qc"
+  mofa_dir: "results/mofa"
+  run_full_model: "results/mofa/mofa/run_01_only_ARD.hdf5"
+  run_filtered_model: "results/mofa/mofa/run_02_filtered_proteins.hdf5"
+  plot_eda_dir: "plots/eda"
+  plot_downstream_dir: "plots/downstream_analysis"
+
+data:
+  id_column: "sample"
+  label_token: "label"
+  group_variable: "region"
+  feature_missingness_threshold: 0.3
+  variance_filter:
+    enabled: true
+    view: "proteomics"
+    top_n: 2000
+
+analysis:
+  random_seed: 2026
+  pca_components: 2
+  top_variable_features: 20
