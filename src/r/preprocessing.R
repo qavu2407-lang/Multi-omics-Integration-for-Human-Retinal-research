@@ -6,27 +6,10 @@ compute_missingness <- function(mat) {
   )
 }
 
-impute_matrix <- function(mat, method = "median") {
-  if (method != "median") {
-    stop(sprintf("Unsupported imputation method: %s", method))
-  }
-
-  out <- mat
-  for (i in seq_len(nrow(out))) {
-    row_values <- out[i, ]
-    if (all(is.na(row_values))) {
-      next
-    }
-    row_values[is.na(row_values)] <- stats::median(row_values, na.rm = TRUE)
-    out[i, ] <- row_values
-  }
-  out
-}
-
-filter_matrix_by_missingness <- function(mat, feature_threshold, sample_threshold) {
+filter_matrix_by_missingness <- function(mat, feature_threshold) {
   feature_keep <- rowMeans(is.na(mat)) <= feature_threshold
-  sample_keep <- colMeans(is.na(mat)) <= sample_threshold
-  mat[feature_keep, sample_keep, drop = FALSE]
+  # Keep all samples for MOFA and only remove heavily missing features.
+  mat[feature_keep, , drop = FALSE]
 }
 
 build_qc_summary <- function(multiomics, config) {
@@ -84,27 +67,22 @@ apply_variance_filter <- function(views, config) {
 }
 
 preprocess_multiomics <- function(multiomics, config) {
-  filtered_views <- purrr::map(multiomics$views, function(mat) {
-    tmp <- filter_matrix_by_missingness(
+  base_views <- purrr::map(multiomics$views, function(mat) {
+    filter_matrix_by_missingness(
       mat,
-      feature_threshold = config$data$feature_missingness_threshold,
-      sample_threshold = config$data$sample_missingness_threshold
+      feature_threshold = config$data$feature_missingness_threshold
     )
-    impute_matrix(tmp, method = config$data$imputation_method)
   })
 
-  common_samples <- Reduce(intersect, purrr::map(filtered_views, colnames))
-  filtered_views <- purrr::map(filtered_views, ~ .x[, common_samples, drop = FALSE])
-  filtered_views <- apply_variance_filter(filtered_views, config)
+  filtered_views <- apply_variance_filter(base_views, config)
 
   sample_metadata <- multiomics$sample_metadata %>%
-    dplyr::filter(sample_id %in% common_samples) %>%
-    dplyr::mutate(sample_id = factor(sample_id, levels = common_samples)) %>%
-    dplyr::arrange(sample_id) %>%
-    dplyr::mutate(sample_id = as.character(sample_id))
+    dplyr::filter(sample_id %in% unique(unlist(purrr::map(base_views, colnames)))) %>%
+    dplyr::arrange(sample_id)
 
   list(
-    views = filtered_views,
+    views = base_views,
+    filtered_views = filtered_views,
     sample_metadata = sample_metadata,
     config = config
   )

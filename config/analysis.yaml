@@ -4,18 +4,16 @@ paths:
   metabolomics: "data/metabolites.csv"
   qc_dir: "results/qc"
   mofa_dir: "results/mofa"
-  evaluation_dir: "results/evaluation"
+  run_full_model: "results/mofa/mofa/run_01_only_ARD.hdf5"
+  run_filtered_model: "results/mofa/mofa/run_02_filtered_proteins.hdf5"
   plot_eda_dir: "plots/eda"
   plot_downstream_dir: "plots/downstream_analysis"
-  plot_evaluation_dir: "plots/evaluation"
 
 data:
   id_column: "sample"
   label_token: "label"
   group_variable: "region"
   feature_missingness_threshold: 0.3
-  sample_missingness_threshold: 0.3
-  imputation_method: "median"
   variance_filter:
     enabled: true
     view: "proteomics"
@@ -25,28 +23,3 @@ analysis:
   random_seed: 2026
   pca_components: 2
   top_variable_features: 20
-
-mofa:
-  views:
-    - "proteomics"
-    - "lipidomics"
-    - "metabolomics"
-  factors: 10
-  maxiter: 1000
-  convergence_mode: "medium"
-  drop_r2: 0.001
-  scale_views: true
-  scale_groups: false
-  spikeslab_weights: true
-  ard_factors: true
-  ard_weights: true
-
-evaluation:
-  repeated_seed_runs: 10
-  sample_size_grid:
-    - 0.6
-    - 0.75
-    - 0.9
-    - 1.0
-  replicates_per_size: 10
-  stability_correlation_threshold: 0.7

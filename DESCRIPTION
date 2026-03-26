@@ -3,9 +3,10 @@ Title: Reproducible Multi-Omics Integration Pipeline for Human Retinal Research
 Version: 0.1.0
 Authors@R:
     person("Project", "Maintainer", email = "maintainer@example.org", role = c("aut", "cre"))
-Description: Research-oriented R pipeline for preprocessing, MOFA2 integration,
-    downstream interpretation, and stability assessment of proteomics,
-    lipidomics, and metabolomics data from human retinal studies.
+Description: Research-oriented hybrid pipeline for preprocessing, quality
+    control, exploratory analysis, and downstream interpretation of
+    externally trained MOFA2 models for proteomics, lipidomics, and
+    metabolomics data from human retinal studies.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

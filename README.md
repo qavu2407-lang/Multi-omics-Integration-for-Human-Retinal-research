@@ -1,30 +1,30 @@
 # Multi-omics-Integration-for-Human-Retinal-research
 
-An end-to-end, research-oriented workflow for multi-omics studies spanning preprocessing, quality control, MOFA+ integration, downstream interpretation, and robustness assessment.
+A research-oriented hybrid workflow for retinal multi-omics studies spanning preprocessing, quality control, exploratory analysis, and downstream interpretation of externally trained MOFA+ models.
 
-## Python pipeline architecture
+## Current architecture
 
-The notebook logic now has a reusable Python package and CLI intended for running the same MOFA+ workflow on new datasets with a configuration file instead of ad hoc notebook edits:
-
-- `src/python/mofapipeline/io.py`: data ingestion, label extraction, and cross-view sample alignment
-- `src/python/mofapipeline/preprocessing.py`: QC summaries, missingness filtering, imputation, and variance filtering
-- `src/python/mofapipeline/eda.py`: EDA plots, top-variable-feature visualizations, and PCA diagnostics
-- `src/python/mofapipeline/mofa.py`: MOFA+ training and downstream interpretation
-- `src/python/mofapipeline/evaluation.py`: repeated-seed stability and sample-size sensitivity analyses
-- `src/python/mofapipeline/cli.py`: command-line entrypoint for staged or end-to-end execution
-- `config/analysis_python.yaml`: reusable study configuration
-
-## Legacy R pipeline
-
-The original refactor into R remains available:
+The supported flow is intentionally split:
 
 - `src/r/io.R`
 - `src/r/preprocessing.R`
 - `src/r/visualization.R`
-- `src/r/mofa_analysis.R`
-- `src/r/evaluation.R`
+- `src/r/mofa_01_io.R`
+- `src/r/mofa_02_downstream.R`
 - `_targets.R`
 - `config/analysis.yaml`
+
+Python notebooks are the source of truth for:
+
+- MOFA+ model training
+- robustness and evaluation analyses
+
+R is the source of truth for:
+
+- data loading
+- QC summaries
+- EDA and PCA plots
+- downstream analysis of saved `.hdf5` MOFA models
 
 ## Repository layout
 
@@ -38,12 +38,9 @@ The original refactor into R remains available:
 ├── plots/
 ├── results/
 ├── scripts/
-│   ├── python/
 │   └── r/
-├── src/
-│   ├── python/
-│   └── r/
-└── tests/
+└── src/
+    └── r/
 ```
 
 ## Expected input format
@@ -60,35 +57,7 @@ Each file is expected to contain:
 - one special row where `sample == "label"` containing biological group labels for each sample column
 - all remaining rows representing molecular features
 
-## Install the Python pipeline
-
-```bash
-python3 -m pip install -e .[mofa]
-```
-
-## Run the Python pipeline
-
-Full run:
-
-```bash
-python3 scripts/python/run_pipeline.py --config config/analysis_python.yaml --stage all
-```
-
-Or via the console entrypoint:
-
-```bash
-mofa-pipeline --config config/analysis_python.yaml --stage all
-```
-
-Run a single stage:
-
-```bash
-mofa-pipeline --config config/analysis_python.yaml --stage eda
-mofa-pipeline --config config/analysis_python.yaml --stage train
-mofa-pipeline --config config/analysis_python.yaml --stage evaluate
-```
-
-## Run the legacy R pipeline
+## Run the R pipeline
 
 ```r
 Rscript scripts/r/run_pipeline.R
@@ -102,6 +71,15 @@ Rscript scripts/r/02_train_and_downstream.R
 Rscript scripts/r/03_evaluation.R
 ```
 
+`scripts/r/03_evaluation.R` is an informational stub in the hybrid workflow because evaluation is handled in Python.
+
+## External MOFA models
+
+The R downstream step expects Python-trained MOFA models at the paths configured in `config/analysis.yaml`:
+
+- `results/mofa/mofa/run_01_only_ARD.hdf5`
+- `results/mofa/mofa/run_02_filtered_proteins.hdf5`
+
 Or interactively:
 
 ```r
@@ -110,12 +88,4 @@ tar_make()
 tar_visnetwork()
 ```
 
-## Research-facing improvements over the notebooks
-
-- Centralized configuration instead of repeated hard-coded parameters
-- Reusable stage-specific modules instead of duplicated notebook cells
-- Explicit quality-control outputs and session metadata
-- Sample alignment and label-consistency checks across omics layers
-- Reproducible seeds and persistent MOFA artifacts for auditability
-- Defensible evaluation design using repeated-seed stability and sample-subset sensitivity
-- A package-based workflow better suited to collaboration, method reuse, and manuscript preparation
+If you use the `targets` entrypoint, make sure the `targets` package is installed in your R environment.

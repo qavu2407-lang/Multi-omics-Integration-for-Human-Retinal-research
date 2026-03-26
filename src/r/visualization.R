@@ -47,11 +47,11 @@ plot_layer_pca <- function(mat, sample_metadata, view_name, group_label = "group
 
   ggplot2::ggplot(
     pca_tbl,
-    ggplot2::aes(x = PC1, y = PC2, color = group, label = sample_id)
+    ggplot2::aes(x = PC1, y = PC2, color = group)
   ) +
     ggplot2::geom_point(size = 3, alpha = 0.85) +
     ggplot2::stat_ellipse(type = "norm", linewidth = 0.7, linetype = 2, show.legend = FALSE) +
-    ggplot2::geom_text(size = 3, nudge_y = 0.05, show.legend = FALSE) +
+    ggplot2::geom_text(ggplot2::aes(label = sample_id), size = 3, nudge_y = 0.05, show.legend = FALSE) +
     ggplot2::labs(
       title = paste("PCA:", stringr::str_to_title(view_name)),
       x = sprintf("PC1 (%.1f%%)", variance[[1]]),

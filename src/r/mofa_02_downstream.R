@@ -3,61 +3,39 @@ normalise_mofa_columns <- function(tbl) {
   tbl
 }
 
-prepare_mofa_object <- function(views, config) {
-  model <- MOFA2::create_mofa(views)
-
-  data_opts <- MOFA2::get_default_data_options(model)
-  data_opts$scale_views <- isTRUE(config$mofa$scale_views)
-  data_opts$scale_groups <- isTRUE(config$mofa$scale_groups)
-
-  model_opts <- MOFA2::get_default_model_options(model)
-  model_opts$num_factors <- config$mofa$factors
-  model_opts$spikeslab_weights <- isTRUE(config$mofa$spikeslab_weights)
-  model_opts$ard_factors <- isTRUE(config$mofa$ard_factors)
-  model_opts$ard_weights <- isTRUE(config$mofa$ard_weights)
-
-  train_opts <- MOFA2::get_default_training_options(model)
-  train_opts$seed <- config$analysis$random_seed
-  train_opts$maxiter <- config$mofa$maxiter
-  train_opts$convergence_mode <- config$mofa$convergence_mode
-  if ("dropR2" %in% names(train_opts)) {
-    train_opts$dropR2 <- config$mofa$drop_r2
-  }
-
-  MOFA2::prepare_mofa(
-    object = model,
-    data_options = data_opts,
-    model_options = model_opts,
-    training_options = train_opts
-  )
+sample_id_key <- function(x) {
+  gsub("^sample_", "", as.character(x))
 }
 
-train_mofa_run <- function(preprocessed_multiomics, config, run_id = "run_01_full", seed = NULL, views_override = NULL) {
-  views <- views_override %||% preprocessed_multiomics$views
-  if (!is.null(seed)) {
-    config$analysis$random_seed <- seed
+extract_factors_table <- function(model, factors = NULL) {
+  factor_tbl <- MOFA2::get_factors(model, factors = factors, as.data.frame = TRUE) %>%
+    normalise_mofa_columns()
+
+  if (all(c("sample", "factor", "value") %in% names(factor_tbl))) {
+    id_cols <- intersect(c("sample", "group"), names(factor_tbl))
+    factor_tbl <- factor_tbl %>%
+      tidyr::pivot_wider(
+        id_cols = dplyr::all_of(id_cols),
+        names_from = factor,
+        values_from = value
+      ) %>%
+      normalise_mofa_columns()
   }
 
-  mofa_dir <- config$paths$mofa_dir
-  ensure_dir(mofa_dir)
-  outfile <- file.path(mofa_dir, paste0(run_id, ".hdf5"))
+  if ("sample" %in% names(factor_tbl)) {
+    names(factor_tbl)[names(factor_tbl) == "sample"] <- "sample_id"
+  }
 
-  model <- prepare_mofa_object(views, config)
-  MOFA2::run_mofa(model, outfile = outfile, use_basilisk = FALSE)
-  outfile
-}
-
-load_mofa_model <- function(path) {
-  MOFA2::load_model(path)
+  factor_tbl
 }
 
 summarise_variance_explained <- function(model, model_id) {
-  variance_tbl <- MOFA2::calculate_variance_explained(model)$r2_per_factor %>%
+  variance_tbl <- MOFA2::get_variance_explained(model, as.data.frame = TRUE)$r2_per_factor %>%
     normalise_mofa_columns()
 
   variance_tbl %>%
     dplyr::group_by(view) %>%
-    dplyr::summarise(r2 = sum(r2), .groups = "drop") %>%
+    dplyr::summarise(r2 = sum(value), .groups = "drop") %>%
     dplyr::mutate(model = model_id)
 }
 
@@ -107,27 +85,59 @@ plot_ranked_weights <- function(model, run_label, factor = "Factor1") {
 }
 
 plot_factor_scatter <- function(model, sample_metadata, run_label, factor_x = "Factor1", factor_y = "Factor2") {
-  factors_tbl <- MOFA2::get_factors(model, factors = c(factor_x, factor_y), as.data.frame = TRUE) %>%
-    normalise_mofa_columns()
-  names(factors_tbl)[names(factors_tbl) == "sample"] <- "sample_id"
+  factor_x_query <- factor_x
+  factor_y_query <- factor_y
+  factor_x <- tolower(factor_x_query)
+  factor_y <- tolower(factor_y_query)
 
-  factor_x <- tolower(factor_x)
-  factor_y <- tolower(factor_y)
+  plot_tbl <- extract_factors_table(model, factors = c(factor_x_query, factor_y_query)) %>%
+    dplyr::mutate(sample_key = sample_id_key(sample_id)) %>%
+    dplyr::left_join(
+      sample_metadata %>% dplyr::mutate(sample_key = sample_id_key(sample_id)),
+      by = "sample_key",
+      suffix = c("", "_meta")
+    ) %>%
+    dplyr::mutate(
+      label = dplyr::coalesce(group_meta, group),
+      display_sample = paste0("S", sample_key)
+    ) %>%
+    dplyr::mutate(sample_id = dplyr::coalesce(sample_id, sample_id_meta)) %>%
+    dplyr::select(-dplyr::any_of(c("sample_id_meta", "sample_key", "group", "group_meta")))
 
-  plot_tbl <- factors_tbl %>%
-    dplyr::left_join(sample_metadata, by = "sample_id")
+  ellipse_tbl <- plot_tbl %>%
+    dplyr::filter(!is.na(label)) %>%
+    dplyr::count(label, name = "n_samples") %>%
+    dplyr::filter(n_samples >= 3)
 
-  ggplot2::ggplot(plot_tbl, ggplot2::aes_string(x = factor_x, y = factor_y, color = "group", label = "sample_id")) +
+  plot_obj <- ggplot2::ggplot(
+    plot_tbl,
+    ggplot2::aes(x = .data[[factor_x]], y = .data[[factor_y]], color = label)
+  ) +
     ggplot2::geom_point(size = 3, alpha = 0.85) +
-    ggplot2::stat_ellipse(type = "norm", linewidth = 0.7, linetype = 2, show.legend = FALSE) +
-    ggplot2::geom_text(size = 3, nudge_y = 0.05, show.legend = FALSE) +
+    ggplot2::geom_text(ggplot2::aes(label = display_sample), size = 3, nudge_y = 0.05, show.legend = FALSE) +
     ggplot2::labs(
-      title = paste(run_label, "latent factor separation"),
-      x = factor_x,
-      y = factor_y,
-      color = "Group"
+      title = paste0(run_label, ": ", factor_x_query, " vs ", factor_y_query),
+      subtitle = "with 95% confidence ellipses",
+      x = factor_x_query,
+      y = factor_y_query,
+      color = "Label"
     ) +
     ggplot2::theme_minimal(base_size = 12)
+
+  if (nrow(ellipse_tbl) > 0) {
+    plot_obj <- plot_obj +
+      ggplot2::stat_ellipse(
+        data = dplyr::semi_join(plot_tbl, ellipse_tbl, by = "label"),
+        ggplot2::aes(x = .data[[factor_x]], y = .data[[factor_y]], color = label),
+        type = "norm",
+        linewidth = 0.7,
+        linetype = 2,
+        inherit.aes = FALSE,
+        show.legend = FALSE
+      )
+  }
+
+  plot_obj
 }
 
 run_downstream_workflow <- function(preprocessed_multiomics, config, run_full_path, run_filtered_path) {
@@ -148,8 +158,16 @@ run_downstream_workflow <- function(preprocessed_multiomics, config, run_full_pa
   variance_plot <- plot_variance_explained_comparison(full_model, filtered_model)
   full_weight_plot <- plot_ranked_weights(full_model, "MOFA run 01")
   filtered_weight_plot <- plot_ranked_weights(filtered_model, "MOFA run 02")
-  full_factor_plot <- plot_factor_scatter(full_model, preprocessed_multiomics$sample_metadata, "MOFA run 01")
-  filtered_factor_plot <- plot_factor_scatter(filtered_model, preprocessed_multiomics$sample_metadata, "MOFA run 02")
+  full_factor_plot <- plot_factor_scatter(
+    full_model,
+    preprocessed_multiomics$sample_metadata,
+    "MOFA+ Run 1 (Full Data)"
+  )
+  filtered_factor_plot <- plot_factor_scatter(
+    filtered_model,
+    preprocessed_multiomics$sample_metadata,
+    "MOFA+ Run 2 (Filtered Proteins)"
+  )
 
   c(
     comparison_csv,
